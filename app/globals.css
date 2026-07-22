@@ -1,0 +1,108 @@
+:root {
+  --bg: #0f1115;
+  --panel: #171a21;
+  --panel-2: #1d212a;
+  --border: #2a2f3a;
+  --text: #e7e9ee;
+  --muted: #9aa2b1;
+  --accent: #6ea8fe;
+  --accent-ink: #0b1220;
+  --err: #ff6b6b;
+  --ok: #57d9a3;
+}
+
+* { box-sizing: border-box; }
+html, body { margin: 0; padding: 0; }
+body {
+  background: var(--bg);
+  color: var(--text);
+  font-family: -apple-system, BlinkMacSystemFont, "Apple SD Gothic Neo", "Pretendard",
+    "Segoe UI", Roboto, sans-serif;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.wrap { max-width: 1240px; margin: 0 auto; padding: 0 20px 60px; }
+
+.topbar {
+  position: sticky; top: 0; z-index: 20;
+  display: flex; align-items: center; justify-content: space-between; gap: 16px;
+  padding: 16px 0; margin-bottom: 8px;
+  background: linear-gradient(var(--bg), var(--bg) 70%, transparent);
+}
+.brand { display: flex; align-items: center; gap: 12px; }
+.logo {
+  font-size: 26px; color: var(--accent);
+  width: 40px; height: 40px; display: grid; place-items: center;
+  background: var(--panel); border: 1px solid var(--border); border-radius: 10px;
+}
+.brand h1 { margin: 0; font-size: 18px; letter-spacing: -0.01em; }
+.brand p { margin: 0; color: var(--muted); font-size: 12px; }
+
+.controls { display: flex; gap: 8px; align-items: center; }
+.key {
+  width: 280px; max-width: 40vw;
+  background: var(--panel); border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: 8px 10px; font-size: 13px;
+}
+select {
+  background: var(--panel); border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: 8px 10px; font-size: 13px;
+}
+
+.grid {
+  display: grid; grid-template-columns: 420px 1fr; gap: 20px; align-items: start;
+}
+@media (max-width: 900px) { .grid { grid-template-columns: 1fr; } }
+
+.panel-head h2 { margin: 0 0 2px; font-size: 15px; }
+.panel-head p { margin: 0; color: var(--muted); font-size: 12px; }
+
+.core {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 14px; padding: 18px; position: sticky; top: 76px;
+}
+@media (max-width: 900px) { .core { position: static; } }
+.core .panel-head { margin-bottom: 14px; }
+
+.field { display: block; margin-bottom: 14px; }
+.field .label { display: block; font-weight: 600; font-size: 13px; margin-bottom: 2px; }
+.field .hint { display: block; color: var(--accent); font-size: 11px; margin-bottom: 6px; opacity: 0.85; }
+
+textarea {
+  width: 100%; resize: vertical;
+  background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: 10px 12px; font: inherit; font-size: 13px;
+}
+textarea:focus, .key:focus, select:focus { outline: 2px solid var(--accent); outline-offset: 0; border-color: transparent; }
+
+.sections { display: flex; flex-direction: column; gap: 14px; }
+.sections .panel-head.sticky {
+  position: sticky; top: 76px; z-index: 10;
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  background: var(--bg); padding: 10px 0;
+}
+.actions { display: flex; gap: 8px; }
+
+button {
+  background: var(--panel-2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: 8px 14px; font: inherit; font-size: 13px; cursor: pointer;
+  transition: background 0.12s, border-color 0.12s;
+}
+button:hover:not(:disabled) { background: #262b36; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+button.primary { background: var(--accent); color: var(--accent-ink); border-color: var(--accent); font-weight: 700; }
+button.primary:hover:not(:disabled) { filter: brightness(1.07); background: var(--accent); }
+button.ghost { padding: 5px 12px; font-size: 12px; }
+
+.card {
+  background: var(--panel); border: 1px solid var(--border);
+  border-radius: 14px; padding: 16px;
+}
+.card-head { display: flex; align-items: center; justify-content: space-between; }
+.card-head h3 { margin: 0; font-size: 14px; }
+.brief { margin: 4px 0 10px; color: var(--muted); font-size: 12px; }
+.err { color: var(--err); font-size: 12px; margin: 0 0 8px; }
+textarea.body { min-height: 60px; }
+
+.foot { color: var(--muted); font-size: 12px; text-align: center; margin-top: 28px; }
