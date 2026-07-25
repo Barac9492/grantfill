@@ -2,6 +2,8 @@
 
 import { useEffect, useState } from "react";
 import { CORE_FIELDS, DEFAULT_SECTIONS, SectionSpec } from "@/lib/defaults";
+import HistoryPanel from "./HistoryPanel";
+import { Snapshot, logGeneration } from "@/lib/history";
 
 type Core = Record<string, string>;
 type SectionState = { spec: SectionSpec; body: string; loading: boolean; error?: string };
@@ -25,6 +27,7 @@ export default function Page() {
   );
   const [runningAll, setRunningAll] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+  const [historyOpen, setHistoryOpen] = useState(false);
 
   // load persisted state
   useEffect(() => {
@@ -90,6 +93,14 @@ export default function Page() {
       setSections((prev) =>
         prev.map((s, i) => (i === idx ? { ...s, body: data.text, loading: false } : s))
       );
+      // 이력 기록은 부수 효과다 — 실패해도 생성 자체를 막지 않는다.
+      void logGeneration({
+        sectionId: sec.spec.id,
+        sectionTitle: sec.spec.title,
+        model,
+        core,
+        output: data.text,
+      }).catch(() => {});
     } catch (e: any) {
       setSections((prev) =>
         prev.map((s, i) =>
@@ -112,6 +123,22 @@ export default function Page() {
 
   function updateBody(idx: number, body: string) {
     setSections((prev) => prev.map((s, i) => (i === idx ? { ...s, body } : s)));
+  }
+
+  function restoreSection(sectionId: string, body: string) {
+    setSections((prev) =>
+      prev.map((s) => (s.spec.id === sectionId ? { ...s, body } : s))
+    );
+  }
+
+  function restoreSnapshot(snap: Snapshot) {
+    setCore(snap.core);
+    setSections((prev) =>
+      prev.map((s) => {
+        const hit = snap.sections.find((x) => x.id === s.spec.id);
+        return hit ? { ...s, body: hit.body, error: undefined } : { ...s, body: "" };
+      })
+    );
   }
 
   function copyAll() {
@@ -208,6 +235,7 @@ export default function Page() {
               </button>
               <button onClick={copyAll}>전체 복사</button>
               <button onClick={downloadMd}>.md 저장</button>
+              <button onClick={() => setHistoryOpen(true)}>이력</button>
             </div>
           </div>
 
@@ -240,6 +268,19 @@ export default function Page() {
         API 키와 작성 내용은 이 브라우저(localStorage)에만 저장되며 서버에 남지 않습니다.
         각 섹션은 편집 후 그대로 복사·제출용으로 쓰세요.
       </footer>
+
+      <HistoryPanel
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        core={core}
+        sections={sections.map((s) => ({
+          id: s.spec.id,
+          title: s.spec.title,
+          body: s.body,
+        }))}
+        onRestoreSection={restoreSection}
+        onRestoreSnapshot={restoreSnapshot}
+      />
     </main>
   );
 }
