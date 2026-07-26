@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { CORE_FIELDS, DEFAULT_SECTIONS, SectionSpec } from "@/lib/defaults";
 import HistoryPanel from "./HistoryPanel";
-import { Snapshot, logGeneration } from "@/lib/history";
+import { BackupStatus, Snapshot, backupStatus, logGeneration } from "@/lib/history";
 
 type Core = Record<string, string>;
 type SectionState = { spec: SectionSpec; body: string; loading: boolean; error?: string };
@@ -28,6 +28,17 @@ export default function Page() {
   const [runningAll, setRunningAll] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [backup, setBackup] = useState<BackupStatus | null>(null);
+
+  // 패널을 열지 않아도 백업이 밀렸다는 건 보여야 한다 — 안 열어보는 게 실패 경로다.
+  const refreshBackup = useCallback(() => {
+    backupStatus()
+      .then(setBackup)
+      .catch(() => {});
+  }, []);
+  useEffect(() => {
+    if (!historyOpen) refreshBackup();
+  }, [historyOpen, refreshBackup]);
 
   // load persisted state
   useEffect(() => {
@@ -100,7 +111,9 @@ export default function Page() {
         model,
         core,
         output: data.text,
-      }).catch(() => {});
+      })
+        .then(refreshBackup)
+        .catch(() => {});
     } catch (e: any) {
       setSections((prev) =>
         prev.map((s, i) =>
@@ -235,7 +248,13 @@ export default function Page() {
               </button>
               <button onClick={copyAll}>전체 복사</button>
               <button onClick={downloadMd}>.md 저장</button>
-              <button onClick={() => setHistoryOpen(true)}>이력</button>
+              <button
+                onClick={() => setHistoryOpen(true)}
+                title={backup?.stale ? "백업하지 않은 기록이 있습니다" : ""}
+              >
+                이력
+                {backup?.stale && <span className="dot" aria-label="백업 필요" />}
+              </button>
             </div>
           </div>
 
@@ -280,6 +299,7 @@ export default function Page() {
         }))}
         onRestoreSection={restoreSection}
         onRestoreSnapshot={restoreSnapshot}
+        onExported={refreshBackup}
       />
     </main>
   );

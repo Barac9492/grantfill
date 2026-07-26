@@ -215,6 +215,22 @@ textarea.body { min-height: 60px; }
 .hs-row.hs-del { background: rgba(255, 107, 107, 0.10); }
 .hs-row.hs-same { color: var(--muted); }
 
+.hs-nudge {
+  display: flex; align-items: center; justify-content: space-between; gap: 14px;
+  margin: 16px 16px -4px;
+  background: rgba(110, 168, 254, 0.08);
+  border: 1px solid rgba(110, 168, 254, 0.35);
+  border-radius: 12px; padding: 12px 14px;
+}
+.hs-nudge strong { font-size: 13px; }
+.hs-nudge p { margin: 2px 0 0; color: var(--muted); font-size: 12px; }
+.hs-nudge button { flex-shrink: 0; }
+
+.dot {
+  display: inline-block; width: 6px; height: 6px; margin-left: 6px;
+  vertical-align: middle; border-radius: 50%; background: var(--accent);
+}
+
 .hs-foot {
   padding: 10px 16px; border-top: 1px solid var(--border);
   background: var(--panel-2); color: var(--muted); font-size: 12px;
