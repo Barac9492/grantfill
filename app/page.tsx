@@ -4,6 +4,7 @@ import { useCallback, useEffect, useState } from "react";
 import { CORE_FIELDS, DEFAULT_SECTIONS, SectionSpec } from "@/lib/defaults";
 import HistoryPanel from "./HistoryPanel";
 import { BackupStatus, Snapshot, backupStatus, logGeneration } from "@/lib/history";
+import { citedFields, stripCitations, todoCount } from "@/lib/cite";
 
 type Core = Record<string, string>;
 type SectionState = { spec: SectionSpec; body: string; loading: boolean; error?: string };
@@ -17,6 +18,7 @@ const LS_CORE = "grantfill.core";
 const LS_KEY = "grantfill.apiKey";
 const LS_MODEL = "grantfill.model";
 const LS_SECTIONS = "grantfill.sections";
+const LS_CITE = "grantfill.cite";
 
 export default function Page() {
   const [core, setCore] = useState<Core>({});
@@ -28,6 +30,7 @@ export default function Page() {
   const [runningAll, setRunningAll] = useState(false);
   const [hydrated, setHydrated] = useState(false);
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [cite, setCite] = useState(true);
   const [backup, setBackup] = useState<BackupStatus | null>(null);
 
   // 패널을 열지 않아도 백업이 밀렸다는 건 보여야 한다 — 안 열어보는 게 실패 경로다.
@@ -49,6 +52,8 @@ export default function Page() {
       if (k) setApiKey(k);
       const m = localStorage.getItem(LS_MODEL);
       if (m) setModel(m);
+      const ct = localStorage.getItem(LS_CITE);
+      if (ct !== null) setCite(ct === "1");
       const s = localStorage.getItem(LS_SECTIONS);
       if (s) {
         const saved: { id: string; body: string }[] = JSON.parse(s);
@@ -72,6 +77,9 @@ export default function Page() {
   useEffect(() => {
     if (hydrated) localStorage.setItem(LS_MODEL, model);
   }, [model, hydrated]);
+  useEffect(() => {
+    if (hydrated) localStorage.setItem(LS_CITE, cite ? "1" : "0");
+  }, [cite, hydrated]);
   useEffect(() => {
     if (hydrated)
       localStorage.setItem(
@@ -97,6 +105,7 @@ export default function Page() {
           sectionBrief: sec.spec.brief,
           apiKey: apiKey || undefined,
           model,
+          cite,
         }),
       });
       const data = await res.json();
@@ -154,22 +163,21 @@ export default function Page() {
     );
   }
 
-  function copyAll() {
-    const doc = sections
+  // 근거 태그는 검토용이다 — 제출 문서로 나가는 경로에서는 걷어낸다.
+  function buildDoc(): string {
+    return sections
       .filter((s) => s.body.trim())
-      .map((s) => `## ${s.spec.title}\n\n${s.body.trim()}`)
+      .map((s) => `## ${s.spec.title}\n\n${stripCitations(s.body).trim()}`)
       .join("\n\n");
-    navigator.clipboard.writeText(doc);
+  }
+
+  function copyAll() {
+    navigator.clipboard.writeText(buildDoc());
   }
 
   function downloadMd() {
     const title = core["운용사 / 회사명"] || "지원서";
-    const doc =
-      `# ${title} — 지원서 초안\n\n` +
-      sections
-        .filter((s) => s.body.trim())
-        .map((s) => `## ${s.spec.title}\n\n${s.body.trim()}`)
-        .join("\n\n");
+    const doc = `# ${title} — 지원서 초안\n\n` + buildDoc();
     const blob = new Blob([doc], { type: "text/markdown" });
     const url = URL.createObjectURL(blob);
     const a = document.createElement("a");
@@ -204,6 +212,14 @@ export default function Page() {
               </option>
             ))}
           </select>
+          <label className="toggle" title="문단마다 어떤 Core 항목을 근거로 썼는지 표시합니다. 복사·저장할 때는 빠집니다.">
+            <input
+              type="checkbox"
+              checked={cite}
+              onChange={(e) => setCite(e.target.checked)}
+            />
+            근거 표시
+          </label>
         </div>
       </header>
 
@@ -279,13 +295,14 @@ export default function Page() {
                 value={s.body}
                 onChange={(e) => updateBody(idx, e.target.value)}
               />
+              {s.body.trim() && <SourceChips body={s.body} />}
             </div>
           ))}
         </section>
       </div>
       <footer className="foot">
         API 키와 작성 내용은 이 브라우저(localStorage)에만 저장되며 서버에 남지 않습니다.
-        각 섹션은 편집 후 그대로 복사·제출용으로 쓰세요.
+        [근거: …] 표시는 검토용이라 복사·저장할 때 자동으로 빠지고, [확인 필요]는 남습니다.
       </footer>
 
       <HistoryPanel
@@ -302,5 +319,22 @@ export default function Page() {
         onExported={refreshBackup}
       />
     </main>
+  );
+}
+
+/** 이 섹션이 실제로 어떤 Core 항목을 근거로 삼았는지, 그리고 아직 뚫린 구멍이 몇 개인지. */
+function SourceChips({ body }: { body: string }) {
+  const fields = citedFields(body);
+  const todos = todoCount(body);
+  if (!fields.length && !todos) return null;
+  return (
+    <div className="cites">
+      {fields.map((f) => (
+        <span className="chip" key={f}>
+          {f}
+        </span>
+      ))}
+      {todos > 0 && <span className="chip warn">확인 필요 {todos}</span>}
+    </div>
   );
 }
