@@ -2,15 +2,18 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
+  BackupStatus,
   Core,
   GenEvent,
   Snapshot,
   SnapshotSection,
+  backupStatus,
   deleteSnapshot,
   exportArchive,
   importArchive,
   listEvents,
   listSnapshots,
+  markExported,
   saveSnapshot,
 } from "@/lib/history";
 import { collapseUnchanged, diffLines, diffStat } from "@/lib/diff";
@@ -22,6 +25,8 @@ type Props = {
   sections: SnapshotSection[];
   onRestoreSection: (sectionId: string, body: string) => void;
   onRestoreSnapshot: (snap: Snapshot) => void;
+  /** 백업이 끝났으니 바깥의 표시도 갱신하라는 신호. */
+  onExported: () => void;
 };
 
 const CURRENT = "__current__";
@@ -36,6 +41,19 @@ function fmt(ts: number): string {
   });
 }
 
+function days(n: number): string {
+  return n < 1 ? "오늘" : `${Math.floor(n)}일 전`;
+}
+
+/** 지금 브라우저 데이터를 지우면 무엇을 잃는지 한 문장으로. */
+function nudgeText(b: BackupStatus): string {
+  const n = b.unexported;
+  if (b.lastExportAt === null) {
+    return `아직 한 번도 백업하지 않았습니다. 기록 ${n}건이 이 브라우저에만 있습니다.`;
+  }
+  return `마지막 백업은 ${days(b.ageDays ?? 0)}이고, 그 뒤로 기록 ${n}건이 쌓였습니다.`;
+}
+
 export default function HistoryPanel({
   open,
   onClose,
@@ -43,6 +61,7 @@ export default function HistoryPanel({
   sections,
   onRestoreSection,
   onRestoreSnapshot,
+  onExported,
 }: Props) {
   const [tab, setTab] = useState<"snapshots" | "events">("snapshots");
   const [snaps, setSnaps] = useState<Snapshot[]>([]);
@@ -53,13 +72,19 @@ export default function HistoryPanel({
   const [baseId, setBaseId] = useState("");
   const [targetId, setTargetId] = useState(CURRENT);
   const [openEvent, setOpenEvent] = useState<string | null>(null);
+  const [backup, setBackup] = useState<BackupStatus | null>(null);
   const fileRef = useRef<HTMLInputElement>(null);
 
   const refresh = useCallback(async () => {
     try {
-      const [s, e] = await Promise.all([listSnapshots(), listEvents()]);
+      const [s, e, b] = await Promise.all([
+        listSnapshots(),
+        listEvents(),
+        backupStatus(),
+      ]);
       setSnaps(s);
       setEvents(e);
+      setBackup(b);
       setBaseId((prev) => prev || (s.length ? s[0].id : ""));
     } catch (e: any) {
       setErr(e?.message || "이력을 불러오지 못했습니다.");
@@ -123,6 +148,9 @@ export default function HistoryPanel({
     a.download = `grantfill-history-${d}.json`;
     a.click();
     URL.revokeObjectURL(url);
+    markExported();
+    onExported();
+    await refresh();
   }
 
   async function onImportFile(file: File) {
@@ -218,6 +246,18 @@ export default function HistoryPanel({
         </header>
 
         {err && <p className="err hs-pad">{err}</p>}
+
+        {backup?.stale && (
+          <div className="hs-nudge">
+            <div>
+              <strong>백업할 때가 됐습니다</strong>
+              <p>{nudgeText(backup)}</p>
+            </div>
+            <button className="primary" onClick={onExport}>
+              지금 내보내기
+            </button>
+          </div>
+        )}
 
         {tab === "snapshots" && (
           <div className="hs-body">
@@ -401,7 +441,20 @@ export default function HistoryPanel({
         )}
 
         <footer className="hs-foot">
-          이력도 이 브라우저에만 저장됩니다(IndexedDB). 백업하려면 <b>내보내기</b>로 파일을 받아 두세요.
+          이력도 이 브라우저에만 저장됩니다(IndexedDB).{" "}
+          {backup && backup.total > 0 ? (
+            <>
+              마지막 백업{" "}
+              {backup.lastExportAt === null ? (
+                <b>없음</b>
+              ) : (
+                <b>{days(backup.ageDays ?? 0)}</b>
+              )}
+              {backup.unexported > 0 && <> · 미백업 {backup.unexported}건</>}
+            </>
+          ) : (
+            <>백업하려면 <b>내보내기</b>로 파일을 받아 두세요.</>
+          )}
         </footer>
       </div>
     </div>

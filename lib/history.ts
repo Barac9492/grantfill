@@ -137,6 +137,71 @@ export async function deleteSnapshot(id: string): Promise<void> {
   await run(SNAPSHOTS, "readwrite", (s) => s.delete(id));
 }
 
+/* ---------------------------------------------------------------- backup */
+
+// 마지막 백업 시각은 기기마다 다르다 — 아카이브에 담지 않고 이 브라우저에만 둔다.
+const LS_LAST_EXPORT = "grantfill.lastExportAt";
+const DAY = 86_400_000;
+const STALE_DAYS = 7;
+const STALE_COUNT = 5;
+
+export function getLastExportAt(): number | null {
+  try {
+    const v = localStorage.getItem(LS_LAST_EXPORT);
+    const n = v ? Number(v) : NaN;
+    return Number.isFinite(n) ? n : null;
+  } catch {
+    return null;
+  }
+}
+
+export function markExported(ts: number = Date.now()): void {
+  try {
+    localStorage.setItem(LS_LAST_EXPORT, String(ts));
+  } catch {}
+}
+
+export type BackupStatus = {
+  total: number;
+  /** 마지막 백업 이후 쌓인 기록 수. 백업한 적 없으면 전체. */
+  unexported: number;
+  lastExportAt: number | null;
+  /** 마지막 백업 이후 지난 날. 백업한 적 없으면 가장 오래된 기록이 생긴 뒤로 잰다. */
+  ageDays: number | null;
+  stale: boolean;
+};
+
+/**
+ * 백업을 권할 때인지 판단한다. 저장소를 타지 않는 순수 함수 — 임계값이 곧 잔소리의
+ * 빈도라서, 손으로 시험할 수 있어야 한다.
+ *
+ * 위험은 "지우면 얼마나 날아가는가"로 재는 게 맞다 — 그래서 건수와 기간을 함께 본다.
+ * 한 번도 백업한 적이 없으면 가장 오래된 기록이 생긴 시점부터 재서, 첫 생성 직후부터
+ * 성가시게 굴지 않는다.
+ */
+export function evaluateBackup(
+  stamps: number[],
+  lastExportAt: number | null,
+  now: number
+): BackupStatus {
+  const total = stamps.length;
+  const unexported =
+    lastExportAt === null ? total : stamps.filter((ts) => ts > lastExportAt).length;
+
+  const since = lastExportAt ?? (stamps.length ? Math.min(...stamps) : null);
+  const ageDays = since === null ? null : (now - since) / DAY;
+  const stale =
+    unexported > 0 && (unexported >= STALE_COUNT || (ageDays ?? 0) >= STALE_DAYS);
+
+  return { total, unexported, lastExportAt, ageDays, stale };
+}
+
+export async function backupStatus(): Promise<BackupStatus> {
+  const [events, snapshots] = await Promise.all([listEvents(), listSnapshots()]);
+  const stamps = [...events.map((e) => e.ts), ...snapshots.map((s) => s.ts)];
+  return evaluateBackup(stamps, getLastExportAt(), Date.now());
+}
+
 /* ------------------------------------------------------- export / import */
 
 export async function exportArchive(): Promise<Archive> {
